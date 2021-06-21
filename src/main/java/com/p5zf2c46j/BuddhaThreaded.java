@@ -48,7 +48,7 @@ public class BuddhaThreaded {
                 pixels[j] = (int) vals[j];
             }
 
-            String fileName = "/data/out/bncm/v_"+(1<<i)+"_"+java.time.Instant.now().getEpochSecond()+".png";
+            String fileName = "/data/out/triple newton 2/v_"+(1<<i)+"_"+java.time.Instant.now().getEpochSecond()+".png";
             File outFile = new File(Paths.get("").toAbsolutePath() + fileName);
             ImageIO.write(cvs, "png", outFile);
 
@@ -61,7 +61,7 @@ public class BuddhaThreaded {
                 pixels[j] = new Color(br, br, br).getRGB();
             }
 
-            fileName = "/data/out/bncm/"+(1<<i)+"_"+java.time.Instant.now().getEpochSecond()+".png";
+            fileName = "/data/out/triple newton 2/"+(1<<i)+"_"+java.time.Instant.now().getEpochSecond()+".png";
             outFile = new File(Paths.get("").toAbsolutePath() + fileName);
             ImageIO.write(cvs, "png", outFile);
 
@@ -84,12 +84,12 @@ public class BuddhaThreaded {
 
 class RendererThread implements Runnable {
     // Static vars
-    public static final int width = 216;
-    public static final int height = 216;
-    private static final double xmin = -9;
-    private static final double xmax = 3;
-    private static final double ymin = -4;
-    private static final double ymax = 8;
+    public static final int width = 3456;
+    public static final int height = 2160;
+    private static final double xmin = -4.1;
+    private static final double xmax = 5.5;
+    private static final double ymin = -3;
+    private static final double ymax = 3;
 
     // Thread stuff
     public Thread thread = null;
@@ -149,8 +149,8 @@ class RendererThread implements Runnable {
                 Complex next = new Complex();
                 for (int k = 0; k < maxIter; k++) {
 
-                    // z = z^2 + c
-                    next.set(sqr(z).add(c));
+                    // z = (sqr(z) + recip(z) + sqr(sqr(z))/-8)/2 + #pixel
+                    next.set(sqr(z).add(recip(z)).add(sqr(sqr(z)).mult(-0.125)).mult(0.5).add(c));
 
                     // if z equals next we have reached a fixed point which means z will never escape the bail condition
                     // so we mark the array as incomplete with a -1 and break
