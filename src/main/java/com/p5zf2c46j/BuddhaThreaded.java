@@ -22,7 +22,7 @@ public class BuddhaThreaded {
 
         for (int i = 4; i < 14; i++) {
             long time = -System.currentTimeMillis();
-            RendererThread[] threads = new RendererThread[4];
+            RendererThread[] threads = new RendererThread[4]; // preferably change this 4 to the amount of threads your processor has
             CountDownLatch latch = new CountDownLatch(threads.length);
 
             for (int j = 0; j < threads.length; j++) {
@@ -42,7 +42,7 @@ public class BuddhaThreaded {
                 }
             }
 
-            double top = max(vals)+1;
+            // make an image containing just the raw number of samples in each pixel
 
             for (int j = 0; j < pixels.length; j++) {
                 pixels[j] = (int) vals[j];
@@ -51,6 +51,10 @@ public class BuddhaThreaded {
             String fileName = "/data/out/bncm/v_"+(1<<i)+"_"+java.time.Instant.now().getEpochSecond()+".png";
             File outFile = new File(Paths.get("").toAbsolutePath() + fileName);
             ImageIO.write(cvs, "png", outFile);
+
+            // then make the actual grayscale image
+
+            double top = max(vals)+1;
 
             for (int j = 0; j < pixels.length; j++) {
                 int br = (int) (Math.pow(vals[j]/top, 1/3D) * 256);
@@ -61,6 +65,7 @@ public class BuddhaThreaded {
             outFile = new File(Paths.get("").toAbsolutePath() + fileName);
             ImageIO.write(cvs, "png", outFile);
 
+            // this is just a bunch of debug timing stuff
             time += System.currentTimeMillis();
             System.out.println(getCurrentTimeStamp()+" : Completed "+threads[0].name+" in "+formatMillis(time));
         }
@@ -119,11 +124,14 @@ class RendererThread implements Runnable {
     public void run() {
         long index = 0;
         double delta = 0.125;
+        // the random is here because when I started x and y at 0 there were a bunch of weird lines in the end result
         Random r = new Random();
         for (double x = -r.nextDouble() * delta; x < width; x += delta) {
             for (double y = -r.nextDouble() * delta; y < height; y += delta) {
+                // a crude way of making the thread only calculate what it needs to
                 if (index++ % numThreads != mod)
                     continue;
+
 
                 Complex c;
                 {
@@ -133,14 +141,19 @@ class RendererThread implements Runnable {
                 }
                 Complex z = c.copy();
 
+                // so to make the buddhabrot we need to store all the indexes we're supposed to add to
+                // but only add to them once we know the value of z tends to infinity
                 ArrayList<Integer> nums = new ArrayList<>();
 
+                // adding this and comparing z to it later speeds up a few fractals by a lot
                 Complex next = new Complex();
                 for (int k = 0; k < maxIter; k++) {
 
                     // z = z^2 + c
                     next.set(sqr(z).add(c));
 
+                    // if z equals next we have reached a fixed point which means z will never escape the bail condition
+                    // so we mark the array as incomplete with a -1 and break
                     if (z.equals(next)) {
                         nums.add(-1);
                         break;
@@ -148,6 +161,8 @@ class RendererThread implements Runnable {
 
                     z.set(next);
 
+                    // checking if z tends to infinity would be too slow so we just check if its distance from the origin is
+                    // greater than some arbitrary value
                     if (magSqr(z) > 256)
                         break;
 
@@ -156,6 +171,7 @@ class RendererThread implements Runnable {
                     nums.add(indX < 0 || indX >= width || indY < 0 || indY >= height ? 0 : indX + width * indY);
                 }
 
+                // if the number of indexes equals the max iterations we know the value of z never escaped the bail condition
                 if (nums.size() == maxIter)
                     continue;
 
@@ -165,6 +181,7 @@ class RendererThread implements Runnable {
                     }
                 }
 
+                // we increment the sample count of the pixel at each of the indexes in vals
                 for (int num : nums) {
                     if (num != 0) {
                         vals[num]++;
