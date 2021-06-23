@@ -114,6 +114,10 @@ public class Complex {
         return new Complex(a.x-b.x, a.y-b.y);
     }
 
+    public static Complex sub(double x, Complex c) {
+        return new Complex(x-c.x, -c.y);
+    }
+
     public Complex mult(double v) {
         x *= v;
         y *= v;
@@ -166,6 +170,10 @@ public class Complex {
         return new Complex(a.x*b.x + a.y*b.y, a.y*b.x - a.x*b.y).div(b.x*b.x + b.y*b.y);
     }
 
+    public static Complex div(double x1, double y1, double x2, double y2) {
+        return new Complex(x1*x2 + y1*y2, y1*x2 - x1*y2).div(x2*x2 + y2*y2);
+    }
+
     public static Complex recip(Complex c) {
         return conj(c).div(magSqr(c));
     }
@@ -198,6 +206,10 @@ public class Complex {
 
     public static Complex sqr(Complex c) {
         return new Complex(c.x*c.x - c.y*c.y, 2*c.x*c.y);
+    }
+
+    public static Complex cube(Complex c) {
+        return new Complex(c.x*c.x*c.x - 3*c.x*c.y*c.y, 3*c.x*c.x*c.y - c.y*c.y*c.y);
     }
 
     public static Complex sqrt(Complex c) {
@@ -236,6 +248,7 @@ public class Complex {
     }
 
     public static Complex flip(Complex c) {
+        //noinspection SuspiciousNameCombination
         return new Complex(c.y, c.x);
     }
 
@@ -288,7 +301,9 @@ public class Complex {
     }
 
     public static Complex tanh(Complex c) {
-        return div(sinh(c), cosh(c));
+        double tanha = Math.tanh(c.x);
+        double tanb = Math.tan(c.y);
+        return div(tanha, tanb, 1, tanha*tanb);
     }
 
     public static Complex atan(Complex c) {
