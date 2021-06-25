@@ -208,6 +208,10 @@ public class Complex {
         return new Complex(c.x*c.x - c.y*c.y, 2*c.x*c.y);
     }
 
+    public static Complex sqr(double x, double y) {
+        return new Complex(x*x - y*y, 2*x*y);
+    }
+
     public static Complex cube(Complex c) {
         return new Complex(c.x*c.x*c.x - 3*c.x*c.y*c.y, 3*c.x*c.x*c.y - c.y*c.y*c.y);
     }

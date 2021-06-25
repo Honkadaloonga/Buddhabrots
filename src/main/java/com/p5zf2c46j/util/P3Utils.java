@@ -122,7 +122,7 @@ public class P3Utils {
     }
 
     public static BufferedImage loadImage(String name) throws IOException {
-        File inputFile = new File(Paths.get("") + "/data/"+name);
+        File inputFile = new File(Paths.get("").toAbsolutePath() + "/data/"+name);
         BufferedImage inputImage = ImageIO.read(inputFile);
         BufferedImage outputImage = new BufferedImage(inputImage.getWidth(), inputImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = outputImage.createGraphics();
@@ -155,7 +155,6 @@ public class P3Utils {
         }
         if (minutes != 0 || b) {
             result.append(minutes).append("m ");
-            b = true;
         }
         result.append(seconds).append(".").append(nf(mils, 3)).append("s");
 

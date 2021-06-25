@@ -36,10 +36,12 @@ public class BuddhaThreaded {
             }
 
             latch.await();
+            time += System.currentTimeMillis();
+            System.out.println(getCurrentTimeStamp()+" : Completed "+threads[0].name+" in "+formatMillis(time));
 
             BufferedImage cvs = new BufferedImage(RendererThread.width, RendererThread.height, BufferedImage.TYPE_INT_ARGB);
             int[] pixels = ((DataBufferInt)cvs.getRaster().getDataBuffer()).getData();
-            long[] vals = new long[pixels.length];
+            int[] vals = new int[pixels.length];
 
             for (RendererThread thread : threads) {
                 for (int j = 0; j < thread.vals.length; j++) {
@@ -47,18 +49,6 @@ public class BuddhaThreaded {
                 }
             }
 
-            // make an image containing just the raw number of samples in each pixel
-            for (int j = 0; j < pixels.length; j++) {
-                pixels[j] = (int) vals[j];
-            }
-
-            {
-                String fileName = "/data/out/z + tanh(z)/v_" + (1 << i) + "_" + now().getEpochSecond() + ".png";
-                File outFile = new File(Paths.get("").toAbsolutePath() + fileName);
-                ImageIO.write(cvs, "png", outFile);
-            }
-
-            // then make the actual grayscale image
             double top = max(vals)+1;
 
             for (int j = 0; j < pixels.length; j++) {
@@ -67,22 +57,19 @@ public class BuddhaThreaded {
             }
 
             {
-                String fileName = "/data/out/z + tanh(z)/" + (1 << i) + "_" + now().getEpochSecond() + ".png";
+                String fileName = "/data/out/burning mandelbrot/" + (1<<i) + "_" + now().getEpochSecond() + ".png";
                 File outFile = new File(Paths.get("").toAbsolutePath() + fileName);
                 ImageIO.write(cvs, "png", outFile);
             }
-            // this is just a bunch of debug timing stuff
-            time += System.currentTimeMillis();
-            System.out.println(getCurrentTimeStamp()+" : Completed "+threads[0].name+" in "+formatMillis(time));
         }
 
         totalTime += System.currentTimeMillis();
         System.out.println(getCurrentTimeStamp() + " : Rendering took " + formatMillis(totalTime));
     }
 
-    private static long max(long[] array) {
-        long m = array[0];
-        for (long a : array) {
+    private static int max(int[] array) {
+        int m = array[0];
+        for (int a : array) {
             m = Math.max(a, m);
         }
         return m;
@@ -90,13 +77,15 @@ public class BuddhaThreaded {
 }
 
 class RendererThread implements Runnable {
+    // 8:5 - 2732 x 1708
+
     // Static vars
     public static final int width = 2160;
     public static final int height = 2160;
-    private static final double xmin = -7;
-    private static final double xmax = 3;
-    private static final double ymin = -5;
-    private static final double ymax = 5;
+    private static final double xmin = -2.25;
+    private static final double xmax = 1.75;
+    private static final double ymin = -2.1;
+    private static final double ymax = 1.9;
 
     // Thread stuff
     public Thread thread = null;
@@ -130,10 +119,10 @@ class RendererThread implements Runnable {
     @Override
     public void run() {
         long index = 0;
-        // this value determines how grainy/noisy the final image is (lower = slower but less noise)
-        double delta = 0.125;
-        // the random is here because when I started x and y at 0 there were a bunch of weird lines in the end result
-        Random r = new Random();
+        // this value determines how noisy the final image is (lower = slower but less noise)
+        double delta = 0.0625;
+        // the random is here because when I started x and y at 0 there was a bunch of weird lines in the end result
+        Random r = new Random(mod + 2137);
         for (double x = -r.nextDouble() * delta; x < width; x += delta) {
             for (double y = -r.nextDouble() * delta; y < height; y += delta) {
                 // a crude way of making the thread only calculate what it needs to
@@ -156,20 +145,29 @@ class RendererThread implements Runnable {
                 // we make an array of a few previous values
                 // comparing z to it later speeds up a few fractals
                 Complex[] p = new Complex[4];
-                Arrays.setAll(p, i -> new Complex());
+                Arrays.setAll(p, i -> new Complex(Double.NaN, Double.NaN));
                 Complex n = new Complex();
 
                 iter:
                 for (int k = 0; k < maxIter; k++) {
 
                     // this is the main formula
-                    // z = sqr((tanh(z) + z)*0.5) + #pixel
-                    n.set(sqr(tanh(z).add(z).mult(0.5)).add(c));
+                    n.set(z);
+                    if (n.x > 0) {
+                        n.y = Math.abs(n.y);
+                    }
+                    n = sqr(n).add(c);
+
+                    // checking if z tends to infinity would be too slow so we just check if its distance from the origin is
+                    // greater than some arbitrary value (might have to change this when using different fractals)
+                    if (magSqr(n) > 1048576) {
+                        break;
+                    }
 
                     // if z is close enough to one of the values in p we have reached a fixed point or a period with the max
                     // length of p.length which means z will never escape the bail condition which we mark by adding -1 to nums
                     for (Complex o : p) {
-                        if (magSqr(sub(n, o)) < 1E-20) {
+                        if (magSqr(sub(n, o)) < 1E-30) {
                             nums.add(-1);
                             break iter;
                         }
@@ -177,12 +175,6 @@ class RendererThread implements Runnable {
 
                     z.set(n);
                     p[k%p.length].set(n);
-
-                    // checking if z tends to infinity would be too slow so we just check if its distance from the origin is
-                    // greater than some arbitrary value (might have to change this when using different fractals)
-                    if (magSqr(z) > 1024) {
-                        break;
-                    }
 
                     // if the pixel is off screen we can mark it as such and continue
                     if (z.x < xmin || z.x >= xmax || z.y < ymin || z.y >= ymax) {
@@ -218,8 +210,6 @@ class RendererThread implements Runnable {
 
             }
         }
-
-        vals[0] = vals[1];
 
         latch.countDown();
     }
