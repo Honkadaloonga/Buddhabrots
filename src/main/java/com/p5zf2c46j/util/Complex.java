@@ -25,7 +25,7 @@ public class Complex {
     }
 
     public static Complex fromAngle(double angle, double mag) {
-        return new Complex(Math.cos(angle), Math.sin(angle)).mult(mag);
+        return fromAngle(angle).mult(mag);
     }
 
     public Complex set(double x, double y) {
@@ -183,7 +183,7 @@ public class Complex {
     }
 
     public static Complex pow(Complex c, double a) {
-        return fromAngle(a * arg(c)).mult(Math.pow(magSqr(c), a*0.5));
+        return fromAngle(a * arg(c), Math.pow(magSqr(c), a*0.5));
     }
 
     public Complex pow(double a, double b) {
@@ -202,6 +202,10 @@ public class Complex {
 
     public static Complex pow(Complex a, Complex b) {
         return pow(a, b.x, b.y);
+    }
+
+    public Complex sqr() {
+        return set(x*x - y*y, 2*x*y);
     }
 
     public static Complex sqr(Complex c) {

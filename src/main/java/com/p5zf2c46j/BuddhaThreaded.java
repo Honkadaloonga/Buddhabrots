@@ -3,9 +3,8 @@ package com.p5zf2c46j;
 import com.p5zf2c46j.util.Complex;
 
 import javax.imageio.ImageIO;
-import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferInt;
+import java.awt.image.DataBufferUShort;
 import java.io.File;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -39,8 +38,8 @@ public class BuddhaThreaded {
             time += System.currentTimeMillis();
             System.out.println(getCurrentTimeStamp()+" : Completed "+threads[0].name+" in "+formatMillis(time));
 
-            BufferedImage cvs = new BufferedImage(RendererThread.width, RendererThread.height, BufferedImage.TYPE_INT_ARGB);
-            int[] pixels = ((DataBufferInt)cvs.getRaster().getDataBuffer()).getData();
+            BufferedImage cvs = new BufferedImage(RendererThread.width, RendererThread.height, BufferedImage.TYPE_USHORT_GRAY);
+            short[] pixels = ((DataBufferUShort)cvs.getRaster().getDataBuffer()).getData();
             int[] vals = new int[pixels.length];
 
             for (RendererThread thread : threads) {
@@ -52,12 +51,11 @@ public class BuddhaThreaded {
             double top = max(vals)+1;
 
             for (int j = 0; j < pixels.length; j++) {
-                int br = (int) (Math.pow(vals[j]/top, 0.5) * 256);
-                pixels[j] = new Color(br, br, br).getRGB();
+                pixels[j] = (short) (Math.pow(vals[j]/top, 0.8) * 65536);
             }
 
             {
-                String fileName = "/data/out/burning mandelbrot/" + (1<<i) + "_" + now().getEpochSecond() + ".png";
+                String fileName = "/data/out/hpmt/" + (1<<i) + "_" + now().getEpochSecond() + ".png";
                 File outFile = new File(Paths.get("").toAbsolutePath() + fileName);
                 ImageIO.write(cvs, "png", outFile);
             }
@@ -82,10 +80,9 @@ class RendererThread implements Runnable {
     // Static vars
     public static final int width = 2160;
     public static final int height = 2160;
-    private static final double xmin = -2.25;
-    private static final double xmax = 1.75;
-    private static final double ymin = -2.1;
-    private static final double ymax = 1.9;
+    private static final double xcenter = -0.4;
+    private static final double ycenter = 0;
+    private static final double magn = 1.1;
 
     // Thread stuff
     public Thread thread = null;
@@ -118,6 +115,16 @@ class RendererThread implements Runnable {
 
     @Override
     public void run() {
+        double xmin, xmax, ymin, ymax;
+        {
+            double xreach = 2.0/magn;
+            double yreach = (2.0*height)/(magn*width);
+            xmin = xcenter - xreach;
+            xmax = xcenter + xreach;
+            ymin = ycenter - yreach;
+            ymax = ycenter + yreach;
+        }
+
         long index = 0;
         // this value determines how noisy the final image is (lower = slower but less noise)
         double delta = 0.0625;
@@ -152,15 +159,15 @@ class RendererThread implements Runnable {
                 for (int k = 0; k < maxIter; k++) {
 
                     // this is the main formula
-                    n.set(z);
-                    if (n.x > 0) {
-                        n.y = Math.abs(n.y);
+                    if (z.x < 0) {
+                        n.set(sqr(z).add(c));
+                    } else {
+                        n.set(conj(z).sqr().add(c));
                     }
-                    n = sqr(n).add(c);
 
                     // checking if z tends to infinity would be too slow so we just check if its distance from the origin is
                     // greater than some arbitrary value (might have to change this when using different fractals)
-                    if (magSqr(n) > 1048576) {
+                    if (magSqr(n) > 256) {
                         break;
                     }
 
