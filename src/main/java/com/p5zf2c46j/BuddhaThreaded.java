@@ -17,6 +17,8 @@ import static com.p5zf2c46j.util.P3Utils.*;
 import static java.time.Instant.now;
 
 public class BuddhaThreaded {
+    public static final int numThreads = 4;
+
     public static void main(String[] args) throws Exception {
         System.out.println(getCurrentTimeStamp() + " : Rendering started");
         long totalTime = -System.currentTimeMillis();
@@ -24,19 +26,18 @@ public class BuddhaThreaded {
         for (int i = 4; i <= 13; i++) {
             long time = -System.currentTimeMillis();
 
-            // for max speed change the length of this array
-            // to the amount of threads your processor has
-            RendererThread[] threads = new RendererThread[4];
-            CountDownLatch latch = new CountDownLatch(threads.length);
+            RendererThread[] threads = new RendererThread[numThreads];
+            CountDownLatch latch = new CountDownLatch(numThreads);
 
-            for (int j = 0; j < threads.length; j++) {
-                threads[j] = new RendererThread(1<<i, j, threads.length, latch);
+            for (int j = 0; j < numThreads; j++) {
+                threads[j] = new RendererThread(1<<i, j, latch);
                 threads[j].start();
             }
 
             latch.await();
+
             time += System.currentTimeMillis();
-            System.out.println(getCurrentTimeStamp()+" : Completed "+threads[0].name+" in "+formatMillis(time));
+            System.out.println("\n"+getCurrentTimeStamp()+" : Completed "+threads[0].name+" in "+formatMillis(time));
 
             BufferedImage cvs = new BufferedImage(RendererThread.width, RendererThread.height, BufferedImage.TYPE_USHORT_GRAY);
             short[] pixels = ((DataBufferUShort)cvs.getRaster().getDataBuffer()).getData();
@@ -48,17 +49,17 @@ public class BuddhaThreaded {
                 }
             }
 
+            double bot = min(vals);
             double top = max(vals)+1;
 
             for (int j = 0; j < pixels.length; j++) {
-                pixels[j] = (short) (Math.pow(vals[j]/top, 0.8) * 65536);
+                double m = map(vals[j], bot, top, 0, 1);
+                pixels[j] = (short) (Math.pow(m, 0.5) * 65536);
             }
 
-            {
-                String fileName = "/data/out/hpmt/" + (1<<i) + "_" + now().getEpochSecond() + ".png";
-                File outFile = new File(Paths.get("").toAbsolutePath() + fileName);
-                ImageIO.write(cvs, "png", outFile);
-            }
+            String fileName = "/data/out/mceltic/" + (1<<i) + "_" + now().getEpochSecond() + ".png";
+            File outFile = new File(Paths.get("").toAbsolutePath() + fileName);
+            ImageIO.write(cvs, "png", outFile);
         }
 
         totalTime += System.currentTimeMillis();
@@ -72,46 +73,38 @@ public class BuddhaThreaded {
         }
         return m;
     }
+
+    private static int min(int[] array) {
+        int m = array[0];
+        for (int a : array) {
+            m = Math.min(a, m);
+        }
+        return m;
+    }
 }
 
 class RendererThread implements Runnable {
     // 8:5 - 2732 x 1708
+    // 2:1 - 3040 x 1520
 
     // Static vars
     public static final int width = 2160;
     public static final int height = 2160;
-    private static final double xcenter = -0.4;
+    private static final double xcenter = -0.125;
     private static final double ycenter = 0;
-    private static final double magn = 1.1;
+    private static final double magn = 1;
 
     // Thread stuff
     public Thread thread = null;
     public final String name;
 
-    // Input vars
+    // Inputs
     private final CountDownLatch latch;
     private final int maxIter;
-    public final int mod;
-    private final int numThreads;
+    public final int index;
 
-    // Output vars
+    // Outputs
     public final int[] vals;
-
-    public RendererThread(int maxIter, int mod, int numThreads, CountDownLatch latch) {
-        this.maxIter = maxIter;
-        this.mod = mod;
-        this.numThreads = numThreads;
-        this.latch = latch;
-        this.vals = new int[width*height];
-        this.name = "Renderer ["+maxIter+", "+mod+"]";
-    }
-
-    public void start() {
-        if (thread == null) {
-            thread = new Thread(this, name);
-            thread.start();
-        }
-    }
 
     @Override
     public void run() {
@@ -124,46 +117,40 @@ class RendererThread implements Runnable {
             ymin = ycenter - yreach;
             ymax = ycenter + yreach;
         }
+        int prev = -1;
 
-        long index = 0;
         // this value determines how noisy the final image is (lower = slower but less noise)
-        double delta = 0.0625;
+        final double delta = 0.05;
         // the random is here because when I started x and y at 0 there was a bunch of weird lines in the end result
-        Random r = new Random(mod + 2137);
+        Random r = new Random(index + 2137);
         for (double x = -r.nextDouble() * delta; x < width; x += delta) {
             for (double y = -r.nextDouble() * delta; y < height; y += delta) {
-                // a crude way of making the thread only calculate what it needs to
-                if (index++ % numThreads != mod) {
-                    continue;
-                }
-
-                Complex c;
-                {
-                    double a = map(x, 0, width, xmin, xmax);
-                    double b = map(y, 0, height, ymax, ymin);
-                    c = new Complex(a, b);
-                }
-                Complex z = c.copy();
-
                 // so to make the buddhabrot we need to store all the indexes we're supposed to add to
                 // but only add to them once we know the value of z tends to infinity
                 ArrayList<Integer> nums = new ArrayList<>();
 
                 // we make an array of a few previous values
                 // comparing z to it later speeds up a few fractals
-                Complex[] p = new Complex[4];
+                Complex[] p = new Complex[3];
                 Arrays.setAll(p, i -> new Complex(Double.NaN, Double.NaN));
+
+                Complex pixel;
+                {
+                    double a = map(x, 0, width, xmin, xmax);
+                    double b = map(y, 0, height, ymax, ymin);
+                    pixel = new Complex(a, b);
+                }
+
+                Complex z = new Complex();
                 Complex n = new Complex();
 
                 iter:
                 for (int k = 0; k < maxIter; k++) {
 
                     // this is the main formula
-                    if (z.x < 0) {
-                        n.set(sqr(z).add(c));
-                    } else {
-                        n.set(conj(z).sqr().add(c));
-                    }
+                    n.set(sqr(z));
+                    n.x = Math.abs(n.x);
+                    n.add(pixel);
 
                     // checking if z tends to infinity would be too slow so we just check if its distance from the origin is
                     // greater than some arbitrary value (might have to change this when using different fractals)
@@ -181,7 +168,7 @@ class RendererThread implements Runnable {
                     }
 
                     z.set(n);
-                    p[k%p.length].set(n);
+                    p[k % p.length].set(n);
 
                     // if the pixel is off screen we can mark it as such and continue
                     if (z.x < xmin || z.x >= xmax || z.y < ymin || z.y >= ymax) {
@@ -216,8 +203,29 @@ class RendererThread implements Runnable {
                 }
 
             }
+
+            int cur = (int) map(x, 0, width, 0, 56);
+            if (cur != prev) {
+                prev = cur;
+                System.out.print("#");
+            }
         }
 
         latch.countDown();
+    }
+
+    public RendererThread(int maxIter, int index, CountDownLatch latch) {
+        this.maxIter = maxIter;
+        this.index = index;
+        this.latch = latch;
+        this.vals = new int[width*height];
+        this.name = "Renderer ["+maxIter+", "+index+"]";
+    }
+
+    public void start() {
+        if (thread == null) {
+            thread = new Thread(this, name);
+            thread.start();
+        }
     }
 }
